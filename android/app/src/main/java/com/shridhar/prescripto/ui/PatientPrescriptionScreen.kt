@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -20,12 +21,64 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.shridhar.prescripto.model.Prescription
+import com.shridhar.prescripto.network.ApiClient
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+@Composable
+fun PatientPrescriptionScreenWrapper(
+    patientId: String,
+    patientName: String,
+    onBack: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val prescriptionService = remember { ApiClient.retrofit.create(com.shridhar.prescripto.network.PrescriptionService::class.java) }
+
+    var prescriptions by remember { mutableStateOf<List<Prescription>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(patientId) {
+        coroutineScope.launch {
+            try {
+                val response = prescriptionService.getPrescriptionsForPatient(patientId)
+                if (response.isSuccessful) {
+                    prescriptions = response.body().orEmpty()
+                } else {
+                    errorMessage = "Error: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                errorMessage = e.localizedMessage ?: "Unknown error"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    if (isLoading) {
+        CircularProgressIndicator()
+    } else if (errorMessage != null) {
+        Text("Failed: $errorMessage")
+    } else {
+        PatientPrescriptionScreen(
+            prescriptions = prescriptions,
+            patientName = patientName,
+            onBack = onBack
+        )
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

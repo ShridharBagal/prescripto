@@ -1,32 +1,40 @@
 package com.shridhar.prescripto
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.shridhar.prescripto.model.Medication
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.shridhar.prescripto.model.Prescription
 import com.shridhar.prescripto.model.UserRole
+import com.shridhar.prescripto.network.ApiClient
+import com.shridhar.prescripto.network.UserService
 import com.shridhar.prescripto.ui.AddPrescriptionScreen
 import com.shridhar.prescripto.ui.AuthScreen
 import com.shridhar.prescripto.ui.DoctorHomeScreen
-import com.shridhar.prescripto.ui.DoctorPrescriptionHistoryScreen
+import com.shridhar.prescripto.ui.DoctorPrescriptionHistoryScreenWrapper
 import com.shridhar.prescripto.ui.OtpEntryScreen
 import com.shridhar.prescripto.ui.PatientHomeScreen
-import com.shridhar.prescripto.ui.PatientPrescriptionScreen
+import com.shridhar.prescripto.ui.PatientPrescriptionScreenWrapper
 import com.shridhar.prescripto.ui.QrScannerScreen
+import com.shridhar.prescripto.ui.Screen
+import kotlinx.coroutines.launch
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            var screen by remember { mutableStateOf("auth") }
+
+
             var isSignUp by remember { mutableStateOf(false) }
             var phone by remember { mutableStateOf("") }
             var role by remember { mutableStateOf<UserRole?>(null) }
@@ -42,123 +50,113 @@ class MainActivity : ComponentActivity() {
             var loggedInPatientId by remember { mutableStateOf("shridhar") }
             var doctorId by remember { mutableStateOf("bagal") }
 
-            val samplePrescriptions = listOf(
-                Prescription(
-                    patientId = "patient_001",
-                    doctorId = "doc_123",
-                    doctorName = "Dr. Sharma",
-                    patientName = "Shridhar",
-                    dateIssued = System.currentTimeMillis() - 3 * 24 * 60 * 60 * 1000,
-                    medications = listOf(
-                        Medication(
-                            name = "Crocin",
-                            dosage = "500mg",
-                            frequency = "1-0-1",
-                            duration = "3 days",
-                            instructions = "After meals"
-                        ),
-                        Medication(
-                            name = "Paracetamol",
-                            dosage = "650mg",
-                            frequency = "1-1-1",
-                            duration = "5 days",
-                            instructions = "nil"
-                        )
-                    ),
-                    notes = "fever",
-                    followUpDate = System.currentTimeMillis() + 4 * 24 * 60 * 60 * 1000
-                )
-            )
+            val userService = ApiClient.retrofit.create(UserService::class.java)
+            val coroutineScope = rememberCoroutineScope()
+            val navController = rememberNavController()
 
-
-
-
-
-            when (screen) {
-
-                "auth" -> AuthScreen(
-                    isSignUp = isSignUp,
-                    onToggleMode = { isSignUp = !isSignUp },
-                    onSubmit = { number, selectedRole ->
-                        phone = number
-                        role = selectedRole
-                        screen = "otp"
-                    }
-                )
-
-                "otp" -> OtpEntryScreen(
-                    phoneNumber = phone,
-                    onOtpSubmit = { otp ->
-                        screen = when (role ?: UserRole.Doctor) {
-                            UserRole.Doctor -> "doctor"
-                            UserRole.Patient -> "patient"
+            NavHost(navController = navController, startDestination = "auth"){
+                composable(Screen.Auth.route){
+                    AuthScreen(
+                        isSignUp = isSignUp,
+                        onToggleMode = { isSignUp = !isSignUp },
+                        onSubmit = { number, selectedRole ->
+                            phone = number
+                            role = selectedRole
+                            navController.navigate(Screen.Otp.route)
                         }
-                    },
-                    onBackToLogin = {
-                        screen = "auth"
-                    }
-                )
+                    )
+                }
 
-                "doctor" -> DoctorHomeScreen(
-                    onScanClick = { screen = "scanner" },
-                    onHistoryClick = {
-                        screen = "doctorHistory"
-                    }
-                )
+                composable(Screen.Otp.route){
+                    OtpEntryScreen(
+                        phoneNumber = phone,
+                        onOtpSubmit = { otp ->
+                            coroutineScope.launch {
+                                try {
+                                    val response = userService.getUserById(phone)
+                                    if (response.isSuccessful) {
+                                        val user = response.body()
+                                        if (user != null) {
+                                            role = if (user.role.equals("Doctor")) UserRole.Doctor else UserRole.Patient
+                                            doctorName = if (role == UserRole.Doctor) user.name else doctorName
+                                            doctorId = if (role == UserRole.Doctor) user.id else doctorId
+                                            loggedInPatientName = if (role == UserRole.Patient) user.name else loggedInPatientName
+                                            loggedInPatientId = if (role == UserRole.Patient) user.id else loggedInPatientId
 
-                "patient" -> PatientHomeScreen(
-                    patientId = "phone",
-                    onViewPrescriptions = {
-                        screen = "patientPrescriptions"
-                    }
-                )
+                                            if (role == UserRole.Doctor)
+                                                navController.navigate(Screen.DoctorHome.route)
+                                            else
+                                                navController.navigate(Screen.PatientHome.route)
+                                        } else {
+                                            navController.navigate(Screen.Auth.route)
+                                        }
+                                    } else {
+                                        navController.navigate(Screen.Auth.route)
+                                    }
+                                } catch (e: Exception) {
+                                    navController.navigate(Screen.Auth.route)
+                                }
+                            }
+                        },
+                        onBackToLogin = {
+                            navController.navigate(Screen.Otp.route)
+                        }
+                    )
 
-                "scanner" -> QrScannerScreen(
-                    onScanResult = { patientId ->
-                        Toast.makeText(this, "Scanned: $patientId", Toast.LENGTH_SHORT).show()
-                        screen = "doctor"
-                    },
-                    onBack = {
-                        screen = "doctor"
-                    }
-                )
+                }
 
-                "addPrescription" -> AddPrescriptionScreen(
-                    patientId = scannedPatientId ?: "",
-                    patientName = scannedPatientName,
-                    doctorId = doctorId,
-                    doctorName = doctorName,
-                    onBack = { screen = "doctor" },
-                    onSubmit = { newPrescription ->
-                        prescriptions.add(newPrescription)
-                        screen = "doctor"
-                    }
-                )
+                composable(Screen.DoctorHome.route){
+                    DoctorHomeScreen(
+                        onScanClick = { navController.navigate(Screen.Scanner.route) },
+                        onHistoryClick = {
+                            navController.navigate(Screen.DoctorHistory.route)
+                        }
+                    )
+                }
 
-//                "patientPrescriptions" -> PatientPrescriptionScreen(
-//                    prescriptions = prescriptions.filter { it.patientId == loggedInPatientId },
-//                    patientName = loggedInPatientName,
-//                    onBack = { screen = "patient" }
-//                )
+                composable(Screen.PatientHome.route){
+                    PatientHomeScreen(
+                        patientId = loggedInPatientId,
+                        onViewPrescriptions = { navController.navigate(Screen.PatientPrescriptions.route) }
+                    )
 
-                "patientPrescriptions" -> PatientPrescriptionScreen(
-                    prescriptions = samplePrescriptions,
-                    patientName = "Ravi Patel",
-                    onBack = { screen = "patient" }
-                )
+                }
+                composable(Screen.Scanner.route){
+                    QrScannerScreen(
+                        onScanResult = { (patientId, patientName) ->
+                            scannedPatientId = patientId
+                            scannedPatientName = patientName
+                            navController.navigate(Screen.AddPrescription.route)
+                        },
+                        onBack = {
+                            navController.navigate(Screen.DoctorHome.route)
+                        }
+                    )
+                }
 
-//                "doctorHistory" -> DoctorPrescriptionHistoryScreen(
-//                    doctorId = doctorId,
-//                    prescriptions = prescriptions,
-//                    onBack = { screen = "doctor" }
-//                )
+                composable(Screen.AddPrescription.route){
+                    AddPrescriptionScreen(
+                        patientId = scannedPatientId ?: "",
+                        patientName = scannedPatientName,
+                        doctorId = doctorId,
+                        doctorName = doctorName,
+                        onBack = { navController.navigate(Screen.DoctorHome.route) },
+                    )
+                }
+                composable(Screen.PatientPrescriptions.route){
+                    PatientPrescriptionScreenWrapper(
+                        patientId = loggedInPatientId,
+                        patientName = loggedInPatientName,
+                        onBack = { navController.navigate(Screen.PatientHome.route) }
+                    )
+                }
 
-                "doctorHistory" -> DoctorPrescriptionHistoryScreen(
-                    doctorId = "doc_123",
-                    prescriptions = samplePrescriptions,
-                    onBack = { screen = "doctor" }
-                )
-
+                composable(Screen.DoctorHistory.route){
+                    DoctorPrescriptionHistoryScreenWrapper(
+                        doctorId =  doctorId,
+                        onBack = { navController.navigate(Screen.DoctorHome.route) }
+                    )
+                }
             }
         }
     }

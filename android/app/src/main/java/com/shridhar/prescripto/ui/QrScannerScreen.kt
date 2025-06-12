@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -36,11 +37,14 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import com.shridhar.prescripto.network.ApiClient
+import com.shridhar.prescripto.network.UserService
+import kotlinx.coroutines.launch
 
 
 @Composable
 fun QrScannerScreen(
-    onScanResult: (String) -> Unit,
+    onScanResult: (Pair<String, String>) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -48,6 +52,8 @@ fun QrScannerScreen(
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val previewView = remember { PreviewView(context) }
     var scannedOnce by remember { mutableStateOf(false) }
+    val userService = ApiClient.retrofit.create(UserService::class.java)
+    val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
@@ -91,11 +97,29 @@ fun QrScannerScreen(
 
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
             if (!scannedOnce) {
-                analyzeQrWithMlKit(imageProxy) { result ->
+
+
+                analyzeQrWithMlKit(imageProxy) { scannedUserId ->
                     scannedOnce = true
-                    Toast.makeText(context, "Scanned: $result", Toast.LENGTH_SHORT).show()
-                    onScanResult(result)
+                    coroutineScope.launch {
+                        try {
+                            val response = userService.getUserById(scannedUserId)
+                            if (response.isSuccessful) {
+                                val user = response.body()
+                                if (user != null && user.role.equals("PATIENT")) {
+                                    onScanResult(user.id to user.name)
+                                } else {
+                                    Toast.makeText(context, "Invalid or non-patient QR", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                Toast.makeText(context, "User not found", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
+
             } else {
                 imageProxy.close()
             }

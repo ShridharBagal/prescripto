@@ -20,12 +20,71 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.shridhar.prescripto.model.Prescription
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+
+@Composable
+fun DoctorPrescriptionHistoryScreenWrapper(
+    doctorId: String,
+    onBack: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val prescriptionService = remember {
+        com.shridhar.prescripto.network.ApiClient.retrofit.create(
+            com.shridhar.prescripto.network.PrescriptionService::class.java
+        )
+    }
+
+    var prescriptions by remember { mutableStateOf<List<Prescription>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(doctorId) {
+        coroutineScope.launch {
+            try {
+                val response = prescriptionService.getPrescriptionsForDoctor(doctorId)
+                if (response.isSuccessful) {
+                    prescriptions = response.body().orEmpty()
+                } else {
+                    errorMessage = "Error: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                errorMessage = e.localizedMessage ?: "Something went wrong"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    when {
+        isLoading -> {
+            androidx.compose.material3.CircularProgressIndicator()
+        }
+        errorMessage != null -> {
+            Text("Error: $errorMessage")
+        }
+        else -> {
+            DoctorPrescriptionHistoryScreen(
+                doctorId = doctorId,
+                prescriptions = prescriptions,
+                onBack = onBack
+            )
+        }
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
