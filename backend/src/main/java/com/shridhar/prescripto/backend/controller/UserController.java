@@ -2,32 +2,29 @@ package com.shridhar.prescripto.backend.controller;
 
 import com.shridhar.prescripto.backend.model.User;
 import com.shridhar.prescripto.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/users")
 public class UserController {
 
-    private final UserRepository userRepo;
+    @Autowired
+    private UserRepository userRepository;
 
-    @PostMapping
-    public ResponseEntity<String> createUser(@RequestBody User user) {
-        // Avoid duplicate phone numbers
-        if (userRepo.findByPhone(user.getPhone()).isPresent()) {
-            return ResponseEntity.badRequest().body("User with this phone already exists.");
-        }
-
-        userRepo.save(user);
-        return ResponseEntity.ok("User created successfully.");
+    @GetMapping("/{id}")
+    public User getUserById(@PathVariable String id) {
+        return userRepository.findById(id).orElse(null);
     }
 
-    @GetMapping
-    public List<User> getAllUsers() {
-        return userRepo.findAll();
+    @PostMapping
+    public String createUser(@RequestBody User user) {
+        userRepository.save(user);
+        return "User created";
+    }
+
+    @GetMapping("/phone/{phone}")
+    public User getUserByPhone(@PathVariable String phone) {
+        return userRepository.findByPhone(phone).orElse(null);
     }
 }

@@ -12,8 +12,14 @@ import lombok.*;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
+
+    @PrePersist
+    public void ensureId() {
+        if (this.id == null || this.id.isEmpty()) {
+            this.id = java.util.UUID.randomUUID().toString();
+        }
+    }
 
     private String name;
 
