@@ -3,13 +3,13 @@ FROM gradle:8.4-jdk17 AS build
 WORKDIR /app
 
 # Only copy build files first to optimize caching
-COPY backend/build.gradle.kts backend/settings.gradle.kts /app/
-COPY backend/gradle /app/gradle
-COPY backend/gradlew /app/
-COPY backend/gradlew.bat /app/
+COPY /build.gradle /settings.gradle /app/
+COPY /gradle /app/gradle
+COPY /gradlew /app/
+COPY /gradlew.bat /app/
 
 # Copy rest of the backend source
-COPY backend/src /app/src
+COPY /src /app/src
 
 # Build JAR
 RUN ./gradlew bootJar --no-daemon
