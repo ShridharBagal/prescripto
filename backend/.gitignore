@@ -1,0 +1,59 @@
+# =============== Java & Gradle ===============
+*.class
+*.jar
+*.war
+*.log
+*.tmp
+*.bak
+
+# Gradle build output
+/build/
+.gradle/
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Gradle subdir outputs (safe defaults)
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# =============== IntelliJ IDEA ===============
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# =============== Eclipse / STS ===============
+.classpath
+.project
+.settings/
+.apt_generated/
+.factorypath
+.springBeans/
+.sts4-cache/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# =============== NetBeans ===============
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# =============== VS Code ===============
+.vscode/
+
+# =============== OS-generated files ===============
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+.env
+Dockerfile
