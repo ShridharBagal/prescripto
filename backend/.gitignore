@@ -55,5 +55,11 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# === Allow essential Gradle files ===
+!build.gradle
+!build.gradle.kts
+!settings.gradle
+!settings.gradle.kts
+
 .env
 Dockerfile
